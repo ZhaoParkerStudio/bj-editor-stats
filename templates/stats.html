@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <title>統計與下載 - 北京編譯中心稿件統計工具</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <header class="app-header">
+    <div class="logo">北京編譯中心稿件統計工具</div>
+    <nav class="nav-main">
+      <a href="{{ url_for('login') }}">返回登錄</a>
+      <a href="{{ url_for('public_board') }}">數據公示</a>
+    </nav>
+  </header>
+
+  <main class="app-main">
+    <section class="card">
+      <h1 class="card-title">統計與下載</h1>
+      <p class="help-text">
+        支持按日期區間與成員篩選統計結果，並導出 TXT / Word / Excel 文件，供汪峰及全體成員存檔留底。
+      </p>
+
+      <form method="get" class="filter-bar">
+        <div class="filter-group">
+          <label for="member">成員</label>
+          <select id="member" name="member">
+            <option value="">全部</option>
+            {% for m in members %}
+              <option value="{{ m }}" {% if selected_member == m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="start_date">起始日期</label>
+          <input id="start_date" name="start_date" type="date" value="{{ start_date }}">
+        </div>
+        <div class="filter-group">
+          <label for="end_date">截止日期</label>
+          <input id="end_date" name="end_date" type="date" value="{{ end_date }}">
+        </div>
+        <div class="filter-actions">
+          <button type="submit" class="btn btn-primary">更新統計</button>
+          <a href="{{ url_for('stats') }}" class="btn btn-ghost">清空條件</a>
+        </div>
+      </form>
+
+      <div class="download-bar">
+        <span>下載統計與詳情：</span>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('export', fmt='txt', start_date=start_date or None, end_date=end_date or None) }}">TXT</a>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('export', fmt='word', start_date=start_date or None, end_date=end_date or None) }}">Word</a>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('export', fmt='excel', start_date=start_date or None, end_date=end_date or None) }}">Excel</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">部門總統計</h2>
+      {% if has_daily or has_interp %}
+        <div class="grid grid-2">
+          <div>
+            <h3 class="sub-title">稿件與收片</h3>
+            {% if dept_totals %}
+              <ul class="stat-list">
+                {% for k, v in dept_totals.items() %}
+                  <li><span class="label">{{ k }}</span><span class="value">{{ v }}</span></li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="help-text">暫無稿件與收片數據。</p>
+            {% endif %}
+          </div>
+          <div>
+            <h3 class="sub-title">同傳 / 解說</h3>
+            <p class="stat-highlight">總任務數：<strong>{{ interp_total }}</strong></p>
+          </div>
+        </div>
+      {% else %}
+        <p class="help-text">當前條件下暫無統計數據。</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">個人統計</h2>
+      {% if personal_stats %}
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>成員</th>
+                <th>各類稿件 / 收片數</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for name, stats_map in personal_stats.items() %}
+                <tr>
+                  <td>{{ name }}</td>
+                  <td>
+                    {% for k, v in stats_map.items() %}
+                      <span class="chip">{{ k }}：{{ v }}</span>
+                    {% endfor %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="help-text">暫無個人稿件統計數據。</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">同傳 / 解說個人統計（顏笑、趙德民重點）</h2>
+      {% if interp_personal %}
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>成員</th>
+                <th>任務類別與次數</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for name, stats_map in interp_personal.items() %}
+                <tr>
+                  <td>{{ name }}</td>
+                  <td>
+                    {% for k, v in stats_map.items() %}
+                      <span class="chip">{{ k }}：{{ v }}</span>
+                    {% endfor %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="help-text">暫無同傳 / 解說統計數據。</p>
+      {% endif %}
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span>建議：領導可定期導出 Excel / Word 報表留存。</span>
+  </footer>
+</body>
+</html>
+

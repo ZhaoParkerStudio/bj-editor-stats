@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <title>數據公示 - 北京編譯中心稿件統計工具</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <header class="app-header">
+    <div class="logo">北京編譯中心稿件統計工具</div>
+    <nav class="nav-main">
+      <a href="{{ url_for('login') }}">返回登錄</a>
+      <a href="{{ url_for('stats') }}">統計與下載</a>
+    </nav>
+  </header>
+
+  <main class="app-main">
+    <section class="card">
+      <h1 class="card-title">數據公示</h1>
+      <p class="help-text">
+        全體成員的日常稿件、收片以及同傳 / 解說任務數據在此公開展示，方便相互了解工作量與任務分佈。
+      </p>
+
+      <form method="get" class="filter-bar">
+        <div class="filter-group">
+          <label for="member">成員</label>
+          <select id="member" name="member">
+            <option value="">全部</option>
+            {% for m in members %}
+              <option value="{{ m }}" {% if selected_member == m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="start_date">起始日期</label>
+          <input id="start_date" name="start_date" type="date" value="{{ start_date }}">
+        </div>
+        <div class="filter-group">
+          <label for="end_date">截止日期</label>
+          <input id="end_date" name="end_date" type="date" value="{{ end_date }}">
+        </div>
+        <div class="filter-actions">
+          <button type="submit" class="btn btn-primary">篩選</button>
+          <a href="{{ url_for('public_board') }}" class="btn btn-ghost">清空條件</a>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">日常稿件與收片</h2>
+      {% if daily_tasks %}
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>成員</th>
+                <th>稿件內容（原始填報）</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in daily_tasks %}
+                <tr>
+                  <td>{{ t.task_date.strftime('%Y-%m-%d') }}</td>
+                  <td>{{ t.member_name }}</td>
+                  <td class="text-pre">{{ t.raw_text }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="help-text">當前條件下暫無日常稿件數據。</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">同傳 / 解說任務</h2>
+      {% if interp_tasks %}
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>成員</th>
+                <th>類別</th>
+                <th>時間段</th>
+                <th>內容</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in interp_tasks %}
+                <tr>
+                  <td>{{ t.task_date.strftime('%Y-%m-%d') }}</td>
+                  <td>{{ t.member_name }}</td>
+                  <td>{{ t.task_type }}</td>
+                  <td>{{ t.time_range }}</td>
+                  <td class="text-pre">{{ t.content }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="help-text">當前條件下暫無同傳 / 解說任務數據。</p>
+      {% endif %}
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span>數據公開透明 · 僅供內部參考與統計使用</span>
+  </footer>
+</body>
+</html>
+

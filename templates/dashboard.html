@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <title>個人操作 - {{ member_name }} - 北京編譯中心稿件統計工具</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <header class="app-header">
+    <div class="logo">北京編譯中心稿件統計工具</div>
+    <nav class="nav-main">
+      <a href="{{ url_for('public_board') }}">數據公示</a>
+      <a href="{{ url_for('stats') }}">統計與下載</a>
+      <a href="{{ url_for('login') }}">切換用戶</a>
+    </nav>
+  </header>
+
+  <main class="app-main">
+    <section class="card">
+      <h1 class="card-title">歡迎，{{ member_name }}</h1>
+      <p class="help-text">請根據您的日常工作選擇對應入口進行填報。</p>
+
+      <div class="grid grid-actions">
+        <a class="btn btn-primary btn-block" href="{{ url_for('daily_tasks', member_name=member_name) }}">
+          日常稿件任務填報
+        </a>
+
+        {% if is_special %}
+          <a class="btn btn-secondary btn-block" href="{{ url_for('interpreting_tasks', member_name=member_name) }}">
+            同傳 / 解說任務填報
+          </a>
+        {% endif %}
+
+        <a class="btn btn-ghost btn-block" href="{{ url_for('public_board') }}">
+          查看全員公示數據
+        </a>
+
+        <a class="btn btn-ghost btn-block" href="{{ url_for('stats') }}">
+          查看統計與下載
+        </a>
+      </div>
+
+      {% if is_leader %}
+        <div class="leader-hint">
+          <strong>領導提示：</strong>您可通過「統計與下載」頁面按日期和人員篩選，導出 Excel / Word / TXT 報表。
+        </div>
+      {% endif %}
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span>數據實時同步 · 支持電腦與手機端瀏覽與填報</span>
+  </footer>
+</body>
+</html>
+

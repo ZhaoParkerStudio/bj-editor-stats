@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <title>同傳 / 解說任務 - {{ member_name }} - 北京編譯中心稿件統計工具</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <header class="app-header">
+    <div class="logo">北京編譯中心稿件統計工具</div>
+    <nav class="nav-main">
+      <a href="{{ url_for('dashboard', member_name=member_name) }}">返回個人首頁</a>
+      <a href="{{ url_for('public_board') }}">數據公示</a>
+      <a href="{{ url_for('stats') }}">統計與下載</a>
+    </nav>
+  </header>
+
+  <main class="app-main">
+    <section class="card">
+      <h1 class="card-title">同傳 / 解說任務填報 - {{ member_name }}</h1>
+      {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+      {% else %}
+        <p class="help-text">
+          本模塊僅用於統計同傳、解說及同傳+解說任務。請按實際情況完整填寫任務類別、時間段與內容。
+        </p>
+      {% endif %}
+
+      <form method="post" class="form-vertical">
+        <label for="task_date">任務日期</label>
+        <input id="task_date" name="task_date" type="date" required>
+
+        <label for="task_type">任務類別</label>
+        <select id="task_type" name="task_type" required>
+          <option value="">請選擇</option>
+          <option value="同傳">同傳</option>
+          <option value="解說">解說</option>
+          <option value="同傳+解說">同傳+解說</option>
+        </select>
+
+        <label for="time_range">完成時間段</label>
+        <input id="time_range" name="time_range" type="text" required placeholder="示例：260301 09:00-11:30">
+
+        <label for="content">任務具體內容</label>
+        <textarea id="content" name="content" rows="4" required placeholder="示例：同傳特朗普講話；解說運動會開幕式；同傳+解說國際峰會"></textarea>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">提交</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">已提交同傳 / 解說任務</h2>
+      {% if tasks %}
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>類別</th>
+                <th>時間段</th>
+                <th>內容</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in tasks %}
+                <tr>
+                  <td>{{ t.task_date.strftime('%Y-%m-%d') }}</td>
+                  <td>{{ t.task_type }}</td>
+                  <td>{{ t.time_range }}</td>
+                  <td class="text-pre">{{ t.content }}</td>
+                  <td>
+                    <form method="post" action="{{ url_for('delete_interpreting_task', member_name=member_name, task_id=t.id) }}" onsubmit="return confirm('確定刪除此條記錄？');">
+                      <button type="submit" class="btn btn-danger btn-sm">刪除</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="help-text">暫無同傳 / 解說任務記錄。</p>
+      {% endif %}
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span>提示：本模塊統計數據將在「統計與下載」中單獨匯總。</span>
+  </footer>
+</body>
+</html>
+
