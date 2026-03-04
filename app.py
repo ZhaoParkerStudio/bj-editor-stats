@@ -1,4 +1,6 @@
 from datetime import datetime
+import os
+import re
 
 from flask import Flask, render_template, request, redirect, url_for, send_file
 from flask_sqlalchemy import SQLAlchemy
@@ -37,8 +39,6 @@ LEADER_NAME = "汪峰"
 def classify_article(line: str) -> str:
     """根據稿件命名規則分類稿件類型，未識別返回 '其他'。"""
     text = line.upper()
-    if "收片" in text:
-        return "收片"
     if "SB+LVO" in text:
         return "SB+LVO"
     if "SB+ONLY" in text or "SBONLY" in text:
@@ -96,57 +96,76 @@ def aggregate_daily_statistics(tasks):
     records = []
     for t in tasks:
         for line in parse_daily_lines(t.raw_text):
-            category = classify_article(line)
-            # 收片N 需要解析數量
-            if category == "收片":
-                # 例如 "收片2" 或 "收片 2"
-                cnt = 1
-                digits = "".join(ch for ch in line if ch.isdigit())
-                if digits:
-                    try:
-                        cnt = int(digits)
-                    except ValueError:
-                        cnt = 1
+            # First, handle normal vs complex 收片
+            handled = False
+
+            # 複雜收片: e.g. "收1侯賽因" -> 收 + number + non-"片" content
+            complex_count = 0
+            for m in re.finditer(r"收\s*(\d+)\s*(?!片)", line):
+                try:
+                    complex_count += int(m.group(1))
+                except ValueError:
+                    continue
+
+            # 普通收片: "收片2" / "收片 2" / "2收片" / just "收片"
+            normal_count = 0
+            m1 = re.search(r"收片\s*(\d+)", line)
+            m2 = re.search(r"(\d+)\s*收片", line)
+            if m1:
+                try:
+                    normal_count = int(m1.group(1))
+                except ValueError:
+                    normal_count = 1
+            elif m2:
+                try:
+                    normal_count = int(m2.group(1))
+                except ValueError:
+                    normal_count = 1
+            elif "收片" in line:
+                normal_count = 1
+
+            if normal_count:
                 records.append(
                     {
                         "成員": t.member_name,
                         "日期": t.task_date.strftime("%Y-%m-%d"),
                         "類型": "收片",
-                        "數量": cnt,
+                        "數量": normal_count,
                         "詳情": line,
                     }
                 )
-            else:
+                handled = True
+
+            if complex_count:
                 records.append(
                     {
                         "成員": t.member_name,
                         "日期": t.task_date.strftime("%Y-%m-%d"),
-                        "類型": category,
-                        "數量": 1,
+                        "類型": "複雜收片",
+                        "數量": complex_count,
                         "詳情": line,
                     }
                 )
+                handled = True
+
+            if handled:
+                # Already split into 收片 / 複雜收片; skip generic classification
+                continue
+
+            # Other article types: generic classification, 1 per line
+            category = classify_article(line)
+            records.append(
+                {
+                    "成員": t.member_name,
+                    "日期": t.task_date.strftime("%Y-%m-%d"),
+                    "類型": category,
+                    "數量": 1,
+                    "詳情": line,
+                }
+            )
 
     if not records:
         return pd.DataFrame(columns=["成員", "日期", "類型", "數量", "詳情"])
-    return pd.DataFrame(records)
-
-
-def aggregate_interpreting_statistics(tasks):
-    """對同傳/解說任務做統計，返回 DataFrame。"""
-    records = []
-    for t in tasks:
-        records.append(
-            {
-                "成員": t.member_name,
-                "日期": t.task_date.strftime("%Y-%m-%d"),
-                "任務類別": t.task_type,
-                "時間段": t.time_range,
-                "內容": t.content,
-            }
-        )
-    if not records:
-        return pd.DataFrame(columns=["成員", "日期", "任務類別", "時間段", "內容"])
     return pd.DataFrame(records)
 
 
