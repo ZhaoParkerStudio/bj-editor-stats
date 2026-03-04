@@ -99,13 +99,20 @@ def aggregate_daily_statistics(tasks):
             # First, handle normal vs complex 收片
             handled = False
 
-            # 複雜收片: e.g. "收1侯賽因" -> 收 + number + non-"片" content
+            # 複雜收片: e.g. "收1侯賽因" -> 「收」後面跟數字，但數字後面不是「片」
             complex_count = 0
-            for m in re.finditer(r"收\s*(\d+)\s*(?!片)", line):
+            for m in re.finditer(r"收(\d+)", line):
                 try:
-                    complex_count += int(m.group(1))
+                    n = int(m.group(1))
                 except ValueError:
                     continue
+                # character right after the digits
+                end = m.end(1)
+                next_char = line[end:end + 1]
+                if next_char == "片":
+                    # this is part of「收片」, not 複雜收片
+                    continue
+                complex_count += n
 
             # 普通收片: "收片2" / "收片 2" / "2收片" / just "收片"
             normal_count = 0
