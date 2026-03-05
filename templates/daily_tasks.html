@@ -35,6 +35,22 @@
         <label for="raw_text">稿件列表（每行一條）</label>
         <textarea id="raw_text" name="raw_text" rows="8" required placeholder="示例：&#10;AI配音_(京)SOT美以伊朗戰事綜合260301_2100&#10;AI配音_(京)SOT哈梅內伊死訊反應260301&#10;(京)(干)阿曼附近海域油輪遭襲260301&#10;(京)LVO伊朗公佈部分遇害軍官名單260301_CC+&#10;(京)SB+LVO德黑蘭民眾悼念哈梅內伊260301&#10;收片2"></textarea>
 
+        <fieldset class="fieldset">
+          <legend>收片統計（可選）</legend>
+          <div class="grid grid-2">
+            <div class="filter-group">
+              <label for="normal_shoupi_count">普通收片數</label>
+              <input id="normal_shoupi_count" name="normal_shoupi_count" type="number" min="0" step="1" placeholder="如：2">
+            </div>
+            <div class="filter-group">
+              <label for="complex_shoupi_count">複雜收片數</label>
+              <input id="complex_shoupi_count" name="complex_shoupi_count" type="number" min="0" step="1" placeholder="如：1">
+            </div>
+          </div>
+          <label for="complex_shoupi_details">複雜收片詳情（可多行，例如：(侯賽因)伊拉克綜合260304）</label>
+          <textarea id="complex_shoupi_details" name="complex_shoupi_details" rows="3" placeholder="(侯賽因)伊拉克綜合260304&#10;(某某)節目名稱260305"></textarea>
+        </fieldset>
+
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">提交</button>
         </div>
@@ -70,6 +86,42 @@
         </div>
       {% else %}
         <p class="help-text">暫無填報記錄。</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">已保存收片記錄（僅本人可見與刪除）</h2>
+      {% if shoupi_records %}
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>普通收片數</th>
+                <th>複雜收片數</th>
+                <th>複雜收片詳情</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in shoupi_records %}
+                <tr>
+                  <td>{{ r.task_date.strftime('%Y-%m-%d') }}</td>
+                  <td>{{ r.normal_count or 0 }}</td>
+                  <td>{{ r.complex_count or 0 }}</td>
+                  <td class="text-pre">{{ r.complex_details }}</td>
+                  <td>
+                    <form method="post" action="{{ url_for('delete_shoupi_record', member_name=member_name, record_id=r.id) }}" onsubmit="return confirm('確定刪除此條收片記錄？');">
+                      <button type="submit" class="btn btn-danger btn-sm">刪除</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="help-text">暫無收片統計記錄。</p>
       {% endif %}
     </section>
   </main>

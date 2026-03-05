@@ -68,6 +68,21 @@ class DailyTask(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class ShoupiRecord(db.Model):
+    """手動填報的收片統計（按成員+日期彙總一次）"""
+
+    id = db.Column(db.Integer, primary_key=True)
+    member_name = db.Column(db.String(50), nullable=False)
+    task_date = db.Column(db.Date, nullable=False)
+    # 當日普通收片數
+    normal_count = db.Column(db.Integer, default=0)
+    # 當日複雜收片數
+    complex_count = db.Column(db.Integer, default=0)
+    # 複雜收片詳情（可多行）
+    complex_details = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class InterpretingTask(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     member_name = db.Column(db.String(50), nullable=False)
@@ -176,6 +191,37 @@ def aggregate_daily_statistics(tasks):
     return pd.DataFrame(records)
 
 
+def aggregate_shoupi_records(records):
+    """將 ShoupiRecord 轉成與 df_daily 結構一致的 DataFrame。"""
+    rows = []
+    for r in records:
+        date_str = r.task_date.strftime("%Y-%m-%d")
+        if (r.normal_count or 0) > 0:
+            rows.append(
+                {
+                    "成員": r.member_name,
+                    "日期": date_str,
+                    "類型": "收片",
+                    "數量": int(r.normal_count),
+                    "詳情": "手動填報普通收片",
+                }
+            )
+        if (r.complex_count or 0) > 0:
+            rows.append(
+                {
+                    "成員": r.member_name,
+                    "日期": date_str,
+                    "類型": "複雜收片",
+                    "數量": int(r.complex_count),
+                    "詳情": (r.complex_details or "").strip() or "手動填報複雜收片",
+                }
+            )
+
+    if not rows:
+        return pd.DataFrame(columns=["成員", "日期", "類型", "數量", "詳情"])
+    return pd.DataFrame(rows)
+
+
 def is_leader(name: str) -> bool:
     return name == LEADER_NAME
 
@@ -224,15 +270,45 @@ def daily_tasks(member_name):
                 .order_by(DailyTask.task_date.desc(), DailyTask.created_at.desc())
                 .all()
             )
+            shoupi_records = (
+                ShoupiRecord.query.filter_by(member_name=member_name)
+                .order_by(ShoupiRecord.task_date.desc(), ShoupiRecord.created_at.desc())
+                .all()
+            )
             return render_template(
                 "daily_tasks.html",
                 member_name=member_name,
                 tasks=tasks,
+                shoupi_records=shoupi_records,
                 error=error,
             )
         task_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         task = DailyTask(member_name=member_name, raw_text=raw_text, task_date=task_date)
         db.session.add(task)
+
+        # 收片手動填報
+        try:
+            normal_shoupi = int(request.form.get("normal_shoupi_count") or 0)
+        except ValueError:
+            normal_shoupi = 0
+        try:
+            complex_shoupi = int(request.form.get("complex_shoupi_count") or 0)
+        except ValueError:
+            complex_shoupi = 0
+        complex_details = (request.form.get("complex_shoupi_details") or "").strip()
+
+        if normal_shoupi or complex_shoupi or complex_details:
+            # 一個成員+日期只保留一條 ShoupiRecord，重新提交會覆蓋
+            record = ShoupiRecord.query.filter_by(
+                member_name=member_name, task_date=task_date
+            ).first()
+            if record is None:
+                record = ShoupiRecord(member_name=member_name, task_date=task_date)
+                db.session.add(record)
+            record.normal_count = normal_shoupi
+            record.complex_count = complex_shoupi
+            record.complex_details = complex_details
+
         db.session.commit()
         return redirect(url_for("daily_tasks", member_name=member_name))
 
@@ -241,7 +317,17 @@ def daily_tasks(member_name):
         .order_by(DailyTask.task_date.desc(), DailyTask.created_at.desc())
         .all()
     )
-    return render_template("daily_tasks.html", member_name=member_name, tasks=tasks)
+    shoupi_records = (
+        ShoupiRecord.query.filter_by(member_name=member_name)
+        .order_by(ShoupiRecord.task_date.desc(), ShoupiRecord.created_at.desc())
+        .all()
+    )
+    return render_template(
+        "daily_tasks.html",
+        member_name=member_name,
+        tasks=tasks,
+        shoupi_records=shoupi_records,
+    )
 
 
 @app.route("/daily/<member_name>/delete/<int:task_id>", methods=["POST"])
@@ -250,6 +336,16 @@ def delete_daily_task(member_name, task_id):
     if task.member_name != member_name:
         return redirect(url_for("daily_tasks", member_name=member_name))
     db.session.delete(task)
+    db.session.commit()
+    return redirect(url_for("daily_tasks", member_name=member_name))
+
+
+@app.route("/shoupi/<member_name>/delete/<int:record_id>", methods=["POST"])
+def delete_shoupi_record(member_name, record_id):
+    record = ShoupiRecord.query.get_or_404(record_id)
+    if record.member_name != member_name:
+        return redirect(url_for("daily_tasks", member_name=member_name))
+    db.session.delete(record)
     db.session.commit()
     return redirect(url_for("daily_tasks", member_name=member_name))
 
@@ -354,23 +450,31 @@ def stats():
     end_date = request.args.get("end_date")
 
     daily_query = DailyTask.query
+    shoupi_query = ShoupiRecord.query
     interp_query = InterpretingTask.query
     if member:
         daily_query = daily_query.filter_by(member_name=member)
         interp_query = interp_query.filter_by(member_name=member)
+        shoupi_query = shoupi_query.filter_by(member_name=member)
     if start_date:
         sd = datetime.strptime(start_date, "%Y-%m-%d").date()
         daily_query = daily_query.filter(DailyTask.task_date >= sd)
         interp_query = interp_query.filter(InterpretingTask.task_date >= sd)
+        shoupi_query = shoupi_query.filter(ShoupiRecord.task_date >= sd)
     if end_date:
         ed = datetime.strptime(end_date, "%Y-%m-%d").date()
         daily_query = daily_query.filter(DailyTask.task_date <= ed)
         interp_query = interp_query.filter(InterpretingTask.task_date <= ed)
+        shoupi_query = shoupi_query.filter(ShoupiRecord.task_date <= ed)
 
     daily_tasks = daily_query.all()
+    shoupi_records = shoupi_query.all()
     interp_tasks = interp_query.all()
 
     df_daily = aggregate_daily_statistics(daily_tasks)
+    df_shoupi = aggregate_shoupi_records(shoupi_records)
+    if not df_shoupi.empty:
+        df_daily = pd.concat([df_daily, df_shoupi], ignore_index=True)
     df_interp = aggregate_interpreting_statistics(interp_tasks)
 
     # 個人統計
@@ -416,18 +520,25 @@ def stats():
 
 def build_export_frames(start_date=None, end_date=None):
     daily_query = DailyTask.query
+    shoupi_query = ShoupiRecord.query
     interp_query = InterpretingTask.query
     if start_date:
         sd = datetime.strptime(start_date, "%Y-%m-%d").date()
         daily_query = daily_query.filter(DailyTask.task_date >= sd)
         interp_query = interp_query.filter(InterpretingTask.task_date >= sd)
+        shoupi_query = shoupi_query.filter(ShoupiRecord.task_date >= sd)
     if end_date:
         ed = datetime.strptime(end_date, "%Y-%m-%d").date()
         daily_query = daily_query.filter(DailyTask.task_date <= ed)
         interp_query = interp_query.filter(InterpretingTask.task_date <= ed)
+        shoupi_query = shoupi_query.filter(ShoupiRecord.task_date <= ed)
     daily_tasks = daily_query.all()
+    shoupi_records = shoupi_query.all()
     interp_tasks = interp_query.all()
     df_daily = aggregate_daily_statistics(daily_tasks)
+    df_shoupi = aggregate_shoupi_records(shoupi_records)
+    if not df_shoupi.empty:
+        df_daily = pd.concat([df_daily, df_shoupi], ignore_index=True)
     df_interp = aggregate_interpreting_statistics(interp_tasks)
     return df_daily, df_interp
 
